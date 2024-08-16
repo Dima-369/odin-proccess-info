@@ -1,0 +1,4 @@
+subprocess.h/subprocess.o
+subprocess.h/libsubprocess.a
+bin/
+odin-process-info
