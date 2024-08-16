@@ -13,7 +13,7 @@ subprocess_s :: struct {
     stdin_file: ^libc.FILE,
     stdout_file: ^libc.FILE,
     stderr_file: ^libc.FILE,
-        // assume that pid_t is an int
+    // assume that pid_t is an int
     child: c.uint,
     return_status: c.int,
     alive: c.size_t,
@@ -26,8 +26,8 @@ foreign subprocess {
     subprocess_destroy :: proc (process: ^subprocess_s) -> c.int ---
 }
 
-    // Inputs:
-    // - args: is a list of strings with at least one element which is the process to execute. It needs to be the full path
+// Inputs:
+// - args: is a list of strings with at least one element which is the process to execute. It needs to be the full path
 exec_and_get_stdout :: proc(args: ..string) -> string {
     process := subprocess_s{ }
     inp : [dynamic]cstring
@@ -70,12 +70,12 @@ exec_and_get_stdout :: proc(args: ..string) -> string {
 check :: proc(search_for: string) {
     pgrep := exec_and_get_stdout("/usr/bin/pgrep", search_for)
     ps_command : [dynamic]string = {
-        // do not use command which gets stuck
+    // do not use command which gets stuck
         "/bin/ps", "-o", "%cpu,%mem,comm"
     }
     stdout := strings.trim_right_space(pgrep)
     if stdout == "" {
-
+        return
     }
     lines := strings.split(stdout, "\n")
     if len(lines) == 0 {
@@ -84,7 +84,6 @@ check :: proc(search_for: string) {
     for line in lines {
         append(&ps_command, line)
     }
-    fmt.println(ps_command)
     ps := exec_and_get_stdout(..ps_command[:])
     if ps != "" {
         fmt.println(ps)
@@ -92,15 +91,18 @@ check :: proc(search_for: string) {
 }
 
 main :: proc() {
-//    if len(os.args) < 2 {
-//        fmt.println("Pass search for as single argument")
-//        os.exit(1)
-//    }
-//    search_for := os.args[1]
-    search_for := "odin"
+    if len(os.args) < 2 {
+        fmt.println("Pass search for as single argument")
+        os.exit(1)
+    }
+    search_for := os.args[1]
 
+    // clear screen
+    fmt.printf("\033[2J")
     for {
+        fmt.printf("\033[H")
         check(search_for)
+        fmt.printf("\033[H");
         time.sleep(500 * time.Millisecond)
     }
 }
