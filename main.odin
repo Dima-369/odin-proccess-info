@@ -11,7 +11,6 @@ import "core:time"
 // - args: is a list of strings with at least one element which is the process to execute. It needs to be the full path
 
 exec_and_get_stdout :: proc(cmd: string) -> string {
-    fmt.printf("Running %s\n", cmd)
     fp := posix.popen(strings.clone_to_cstring(cmd), "r")
     if fp == nil {
         fmt.println("Failed to start process")
