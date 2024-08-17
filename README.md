@@ -1,11 +1,4 @@
-# Setup steps in the subprocess.h directory
-
 Needs latest `Odin` version with `posix` package support.
-
-```bash
-gcc -c -o subprocess.o subprocess.c
-ar rcs libsubprocess.a subprocess.o
-```
 
 # Output
 
