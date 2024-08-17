@@ -1,78 +1,46 @@
 package main
 
-import "core:c"
-import "core:c/libc"
 import "core:fmt"
 import "core:os"
 import "core:strings"
+import "core:sys/posix"
 import "core:time"
-
-foreign import subprocess "subprocess.h/libsubprocess.a"
-
-subprocess_s :: struct {
-    stdin_file: ^libc.FILE,
-    stdout_file: ^libc.FILE,
-    stderr_file: ^libc.FILE,
-    // assume that pid_t is an int
-    child: c.uint,
-    return_status: c.int,
-    alive: c.size_t,
-}
-
-foreign subprocess {
-    subprocess_create :: proc (command_line: [^]cstring, options: c.int, out_process: ^subprocess_s) -> c.int ---
-    subprocess_stdout :: proc (process: ^subprocess_s) -> ^libc.FILE ---
-    subprocess_join :: proc (process: ^subprocess_s, out_return: ^c.int) -> c.int ---
-    subprocess_destroy :: proc (process: ^subprocess_s) -> c.int ---
-}
-
 // Inputs:
 // - args: is a list of strings with at least one element which is the process to execute. It needs to be the full path
-exec_and_get_stdout :: proc(args: ..string) -> string {
-    process := subprocess_s{ }
-    inp : [dynamic]cstring
-    for arg in args {
-        append(&inp, strings.clone_to_cstring(arg))
-    }
-    append(&inp, nil)
-    okay := subprocess_create(raw_data(inp), 0, &process)
-    if 0 != okay {
-        fmt.println(fmt.aprint("Can not create process:", args))
-        os.exit(1)
-    }
-    defer subprocess_destroy(&process)
 
-    okay = subprocess_join(&process, nil)
-    if 0 != okay {
-        fmt.println("Failed to wait on process completion")
+exec_and_get_stdout :: proc(cmd: string) -> string {
+    fmt.printf("Running %s\n", cmd)
+    fp := posix.popen(strings.clone_to_cstring(cmd), "r")
+    if fp == nil {
+        fmt.println("Failed to start process")
         os.exit(1)
     }
 
-    s : [dynamic]u8
-    stdout := subprocess_stdout(&process)
-    for {
-        char : i32 = libc.fgetc(stdout)
-        if char == libc.EOF {
-            break
-        }
-        append(&s, u8(char))
+    sb := strings.builder_make()
+    output: [8192]byte
+    for posix.fgets(raw_data(output[:]), len(output), fp) != nil {
+        s := strings.trim_right_null(string(output[:]))
+        strings.write_string(&sb, s)
     }
 
-    okay = subprocess_destroy(&process)
-    if 0 != okay {
-        fmt.println("Failed to destroy process")
+    status := posix.pclose(fp)
+    if status == -1 {
+        fmt.println("Error reported by pclose()")
         os.exit(1)
     }
 
-    return transmute(string)s[:]
+    return strings.to_string(sb)
 }
 
-check :: proc(search_for: string) {
-    pgrep := exec_and_get_stdout("/usr/bin/pgrep", search_for)
-    ps_command : [dynamic]string = {
-    // do not use command which gets stuck
-        "/bin/ps", "-o", "%cpu,%mem,comm"
+check :: proc(search_for: []string) {
+    args := [dynamic]string{ "/usr/bin/pgrep" }
+    for search in search_for {
+        append(&args, search)
     }
+    pgrep := exec_and_get_stdout(strings.join(args[:], " "))
+
+    ps_command_sb := strings.builder_make()
+    strings.write_string(&ps_command_sb, "/bin/ps -o %cpu,%mem,command ")
     stdout := strings.trim_right_space(pgrep)
     if stdout == "" {
         return
@@ -81,21 +49,24 @@ check :: proc(search_for: string) {
     if len(lines) == 0 {
         return
     }
-    for line in lines {
-        append(&ps_command, line)
-    }
-    ps := exec_and_get_stdout(..ps_command[:])
-    if ps != "" {
-        fmt.println(ps)
+    strings.write_string(&ps_command_sb, strings.join(lines, ","))
+    ps := exec_and_get_stdout(strings.to_string(ps_command_sb))
+    length := 90
+    for line in strings.split(ps, "\n") {
+        if len(line) > length {
+            fmt.println(line[:length])
+        } else {
+            fmt.println(line)
+        }
     }
 }
 
 main :: proc() {
     if len(os.args) < 2 {
-        fmt.println("Pass search for as single argument")
+        fmt.println("Pass the search arguments")
         os.exit(1)
     }
-    search_for := os.args[1]
+    search_for := os.args[1:]
 
     // clear screen
     fmt.printf("\033[2J")
