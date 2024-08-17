@@ -49,7 +49,7 @@ check :: proc(search_for: []string) {
     lines := strings.split(ps, "\n")
     filtered := slice.filter(lines, proc (line: string) -> bool {
         lower = strings.to_lower(line)
-        return slice.all_of_proc(search_for, proc (search: string) -> bool {
+        return slice.any_of_proc(search_for, proc (search: string) -> bool {
             return strings.contains(lower, search)
         })
     })
@@ -76,6 +76,6 @@ main :: proc() {
         fmt.printf("\033[H")
         check(search_for)
         fmt.printf("\033[H");
-        time.sleep(500 * time.Millisecond)
+        time.sleep(720 * time.Millisecond)
     }
 }
